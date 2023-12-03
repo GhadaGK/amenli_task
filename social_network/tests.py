@@ -3,7 +3,10 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from django.test import TestCase
 from .models import *
+from .signals import *
+import pytest
 
+@pytest.mark.django_db
 class TestViews(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -148,6 +151,23 @@ class TestViews(TestCase):
         response = self.client.post(url, {'post_id': post.id}, headers =headers, format='json')
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_post_like_signal(self):
+        user = CustomUser.objects.create_user(
+            username= 'followeruser',
+            password= 'followerpassword',
+            email='followeruser@gmail.com'
+        )
+        post = Post.objects.create(user=user, content='Test post content')
+        # Connect the signal to the test function
+        def handler(sender, target_post, **kwargs):
+            assert sender == user
+            assert target_post == post
+        post_liked.connect(handler, sender=CustomUser)
+        # Trigger the signal
+        Like.objects.create(user=user, post=post)
+        # Disconnect the signal to avoid interference with other tests
+        post_liked.disconnect(handler, sender=CustomUser)
+
     def test_unlike_post_view(self):
         token = Token.objects.filter(is_active = True).last()
         headers = {'Authorization': f'{token.token}'}
@@ -169,6 +189,23 @@ class TestViews(TestCase):
         url = reverse('unlike_post')
         response = self.client.delete(url, {'post_id': post.id}, format='json')
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_post_unlike_signal(self):
+        user = CustomUser.objects.create_user(
+            username= 'followeruser',
+            password= 'followerpassword',
+            email='followeruser@gmail.com'
+        )
+        post = Post.objects.create(user=user, content='Test post content')
+        # Connect the signal to the test function
+        def handler(sender, target_post, **kwargs):
+            assert sender == user
+            assert target_post == post
+        post_unliked.connect(handler, sender=CustomUser)
+        # Trigger the signal
+        Like.objects.filter(user = user ,post = post).delete()
+        # Disconnect the signal to avoid interference with other tests
+        post_unliked.disconnect(handler, sender=CustomUser)
 
     def test_follow_user_view(self):
         token = Token.objects.filter(is_active = True).last()
@@ -202,6 +239,27 @@ class TestViews(TestCase):
         response = self.client.post(url, {'following_id': following.id}, headers= headers, format='json')
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_user_followed_signal(self):
+        follower = CustomUser.objects.create_user(
+            username= 'followeruser',
+            password= 'followerpassword',
+            email='followeruser@gmail.com'
+        )
+        following = CustomUser.objects.create_user(
+            username= 'followinguser',
+            password= 'followingpassword',
+            email='followinguser@gmail.com'
+        )
+        # Connect the signal to the test function
+        def handler(sender, target_user, **kwargs):
+            assert sender == follower
+            assert target_user == following
+        user_followed.connect(handler, sender=CustomUser)
+        # Trigger the signal
+        Follow.objects.create(follower=follower, following=following)
+        # Disconnect the signal to avoid interference with other tests
+        user_followed.disconnect(handler, sender=CustomUser)
+
     def test_unfollow_user_view(self):
         token = Token.objects.filter(is_active = True).last()
         headers = {'Authorization': f'{token.token}'}
@@ -223,6 +281,27 @@ class TestViews(TestCase):
         url = reverse('unfollow_user')
         response = self.client.delete(url, {'following_id': following.id}, format='json')
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_user_unfollowed_signal(self):
+        follower = CustomUser.objects.create_user(
+            username= 'followeruser',
+            password= 'followerpassword',
+            email='followeruser@gmail.com'
+        )
+        following = CustomUser.objects.create_user(
+            username= 'followinguser',
+            password= 'followingpassword',
+            email='followinguser@gmail.com'
+        )
+        # Connect the signal to the test function
+        def handler(sender, target_user, **kwargs):
+            assert sender == follower
+            assert target_user == following
+        user_unfollowed.connect(handler, sender=CustomUser)
+        # Trigger the signal
+        Follow.objects.create(follower=follower, following=following).delete()
+        # Disconnect the signal to avoid interference with other tests
+        user_unfollowed.disconnect(handler, sender=CustomUser)
 
     def test_logout(self):
         token = Token.objects.filter(is_active = True).last()

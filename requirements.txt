@@ -1,0 +1,9 @@
+python-dateutil
+django
+djangorestframework
+django-cors-headers
+django-utils-six
+redis
+celery
+celery[redis]
+django-celery-beat
